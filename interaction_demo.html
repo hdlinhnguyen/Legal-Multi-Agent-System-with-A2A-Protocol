@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2A Multi-Agent Interaction Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #06b6d4;
+            --accent-purple: #a855f7;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --font-family: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            min-height: 100vh;
+            padding: 2.5rem 1.5rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+            animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            font-family: var(--font-family);
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            backdrop-filter: blur(8px);
+        }
+
+        .btn:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(168, 85, 247, 0.2));
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Card styles */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        /* Topology Canvas */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 480px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        svg.network-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .node-agent {
+            position: absolute;
+            z-index: 2;
+            width: 130px;
+            padding: 0.75rem;
+            border-radius: 12px;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: center;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .node-agent.active {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
+            transform: scale(1.05);
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        .node-agent.down {
+            border-color: var(--accent-rose);
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.35);
+            opacity: 0.6;
+        }
+
+        .node-agent.down .node-status {
+            background-color: var(--accent-rose);
+        }
+
+        .node-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .node-port {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .node-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .node-status {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--accent-emerald);
+        }
+
+        /* Packet Animation */
+        .packet {
+            stroke-dasharray: 8 4;
+            animation: dash 5s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -40;
+            }
+        }
+
+        /* Container boundary for Stage 4 */
+        .process-boundary {
+            position: absolute;
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.5s ease;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .process-label {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.25);
+            font-weight: bold;
+        }
+
+        /* Details & Stepper panel */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .stepper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-step {
+            margin-top: 1rem;
+            padding-left: 1rem;
+            border-left: 2px solid var(--border-color);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-step.active {
+            border-color: var(--accent-cyan);
+        }
+
+        .timeline-step.active::before {
+            background-color: var(--accent-cyan);
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        .timeline-step::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #334155;
+            transition: all 0.3s ease;
+        }
+
+        .step-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .step-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Code/Log Console */
+        .console {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: #38bdf8;
+            max-height: 280px;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+        }
+
+        .console-line {
+            margin-bottom: 0.35rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .console-time {
+            color: var(--text-secondary);
+        }
+
+        .console-tag {
+            color: var(--accent-purple);
+        }
+
+        /* Feature matrices */
+        table.matrix {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        table.matrix th, table.matrix td {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        table.matrix th {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* CSS Keyframe animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>A2A Multi-Agent Architecture</h1>
+            <p>Interactive demonstration of Stage 4 (In-Process) vs. Stage 5 (Distributed A2A Protocol)</p>
+        </header>
+
+        <div class="controls">
+            <button class="btn active" id="btn-stage5" onclick="setStage(5)">
+                🌐 Stage 5: Distributed A2A
+            </button>
+            <button class="btn" id="btn-stage4" onclick="setStage(4)">
+                📦 Stage 4: In-Process Graph
+            </button>
+            <button class="btn" id="btn-fault" onclick="toggleFaultSimulation()">
+                ⚡ Toggle Tax Agent Failure
+            </button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2 class="card-title" id="topology-title">Stage 5: Distributed Agent-to-Agent Architecture</h2>
+                
+                <div class="canvas-container" id="canvas">
+                    <!-- Stage 4 Process boundary (visible only in stage 4 mode) -->
+                    <div class="process-boundary" id="process-boundary" style="display:none;">
+                        <span class="process-label">Python Process (In-Memory)</span>
+                    </div>
+
+                    <!-- Nodes -->
+                    <div class="node-agent" id="node-user" style="left: 40px; top: 180px; width: 100px;">
+                        <div class="node-name">👤 User</div>
+                        <div class="node-port">Web / Client</div>
+                    </div>
+
+                    <div class="node-agent" id="node-customer" style="left: 200px; top: 180px;">
+                        <div class="node-name">🤖 Customer</div>
+                        <div class="node-port">Port 10100</div>
+                        <div class="node-status-badge"><span class="node-status"></span>Active</div>
+                    </div>
+
+                    <div class="node-agent" id="node-registry" style="left: 360px; top: 30px;">
+                        <div class="node-name">📋 Registry</div>
+                        <div class="node-port">Port 10000</div>
+                        <div class="node-status-badge"><span class="node-status"></span>Active</div>
+                    </div>
+
+                    <div class="node-agent" id="node-law" style="left: 450px; top: 180px;">
+                        <div class="node-name">⚖️ Law Agent</div>
+                        <div class="node-port">Port 10101</div>
+                        <div class="node-status-badge"><span class="node-status"></span>Active</div>
+                    </div>
+
+                    <div class="node-agent" id="node-tax" style="left: 720px; top: 100px;">
+                        <div class="node-name">💰 Tax Agent</div>
+                        <div class="node-port">Port 10102</div>
+                        <div class="node-status-badge" id="tax-badge"><span class="node-status"></span>Active</div>
+                    </div>
+
+                    <div class="node-agent" id="node-compliance" style="left: 720px; top: 260px;">
+                        <div class="node-name">✅ Compliance</div>
+                        <div class="node-port">Port 10103</div>
+                        <div class="node-status-badge"><span class="node-status"></span>Active</div>
+                    </div>
+
+                    <!-- Connection paths overlay SVG -->
+                    <svg class="network-lines" id="svg-connections">
+                        <!-- User to Customer Agent -->
+                        <path id="path-user-customer" d="M 140 220 L 200 220" stroke="rgba(255,255,255,0.15)" stroke-width="2" fill="none" />
+                        
+                        <!-- Customer Agent to Law Agent -->
+                        <path id="path-customer-law" d="M 330 220 L 450 220" stroke="rgba(255,255,255,0.15)" stroke-width="2" fill="none" />
+                        
+                        <!-- Registry discovery lines (dashed) -->
+                        <path id="path-customer-registry" d="M 265 180 Q 330 110 375 75" stroke="rgba(6, 182, 212, 0.2)" stroke-dasharray="4 4" stroke-width="1.5" fill="none" />
+                        <path id="path-law-registry" d="M 500 180 Q 450 110 425 75" stroke="rgba(6, 182, 212, 0.2)" stroke-dasharray="4 4" stroke-width="1.5" fill="none" />
+
+                        <!-- Law Agent to Tax / Compliance Parallel lines -->
+                        <path id="path-law-tax" d="M 580 200 Q 640 140 720 140" stroke="rgba(255,255,255,0.15)" stroke-width="2" fill="none" />
+                        <path id="path-law-compliance" d="M 580 230 Q 640 280 720 280" stroke="rgba(255,255,255,0.15)" stroke-width="2" fill="none" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="card">
+                    <h2 class="card-title">🔬 Stepper Execution</h2>
+                    <div class="stepper">
+                        <button class="btn" style="padding:0.4rem 0.8rem; font-size:0.8rem;" onclick="resetStep()">⏪ Reset</button>
+                        <span id="step-counter" style="font-family: var(--font-mono); font-size:0.85rem; font-weight:bold;">Step 0 / 6</span>
+                        <button class="btn" style="padding:0.4rem 0.8rem; font-size:0.8rem; border-color: var(--accent-cyan);" onclick="nextStep()">⏩ Next</button>
+                    </div>
+
+                    <div id="step-details" style="min-height: 120px;">
+                        <div class="timeline-step active" id="step-box">
+                            <div class="step-title" id="step-title">Submit Question</div>
+                            <div class="step-desc" id="step-desc">Click "Next" to begin tracing the multi-agent life cycle.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="card-title">📟 Distributed Logs & Tracing</h2>
+                    <div class="console" id="console">
+                        <div class="console-line"><span class="console-time">[14:55:00]</span> Initialized visualization client. Standing by...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h2 class="card-title">💡 Architecture Comparison</h2>
+            <table class="matrix">
+                <thead>
+                    <tr>
+                        <th>Capability</th>
+                        <th>Stage 4 (In-Process Graph)</th>
+                        <th>Stage 5 (Distributed A2A Network)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Deployment Topology</strong></td>
+                        <td>Single Python Process / Shared execution memory.</td>
+                        <td>Multiple microservices running on unique ports/hosts.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Discovery & Registry</strong></td>
+                        <td>Hardcoded in-memory mappings or imports.</td>
+                        <td>Dynamic Service Discovery using a Registry on startup.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Distributed Tracing</strong></td>
+                        <td>Single-process execution flow (easier local debugging).</td>
+                        <td>`trace_id` and `context_id` header propagation across HTTP calls.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fault Isolation</strong></td>
+                        <td>One failure kills the whole process.</td>
+                        <td>Surviving nodes complete the query even if Tax Agent dies.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- SECTION: AI Engineer Deep-Dive — Agent Interaction Walkthrough   -->
+        <!-- ================================================================ -->
+        <div style="margin-top: 3rem;">
+            <div style="text-align:center; margin-bottom: 2rem;">
+                <h2 style="font-size:2rem; font-weight:800; background: linear-gradient(135deg, #10b981, #06b6d4); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+                    🔬 AI Engineer: Agent Interaction Deep-Dive
+                </h2>
+                <p style="color: var(--text-secondary); margin-top:0.5rem;">
+                    Phân tích kỹ thuật đầy đủ — code, data flow, và protocol của từng bước tương tác giữa các Agent
+                </p>
+            </div>
+
+            <!-- Tab buttons -->
+            <div style="display:flex; gap:0.75rem; justify-content:center; margin-bottom:1.5rem; flex-wrap:wrap;">
+                <button class="btn active" id="eng-btn-s4" onclick="showEngTab('s4')" style="border-color: var(--accent-emerald);">
+                    📦 Stage 4: In-Process Graph
+                </button>
+                <button class="btn" id="eng-btn-s5" onclick="showEngTab('s5')" style="">
+                    🌐 Stage 5: Distributed A2A
+                </button>
+            </div>
+
+            <!-- Stage 4 Deep-Dive -->
+            <div id="eng-s4" style="display:block;">
+                <div style="display:grid; grid-template-columns:1fr; gap:1.5rem;">
+
+                    <!-- Overview -->
+                    <div class="card" style="border-color: rgba(16,185,129,0.3);">
+                        <h3 class="card-title" style="color: var(--accent-emerald);">⚙️ Kiến trúc Stage 4: Single-Process LangGraph StateGraph</h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+                            <div>
+                                <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem;">
+                                    Trong Stage 4, toàn bộ pipeline chạy trong <strong>một Python process duy nhất</strong>. 
+                                    Các agent là các <em>nodes</em> trong LangGraph <code>StateGraph</code>, giao tiếp qua 
+                                    shared <code>LawState</code> dictionary — không có HTTP, không có serialization.
+                                </p>
+                                <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:1rem; font-size:0.8rem;">
+                                    <div style="color:var(--accent-emerald); font-weight:600; margin-bottom:0.5rem;">✅ Ưu điểm</div>
+                                    <ul style="color:var(--text-secondary); padding-left:1.2rem; line-height:1.8;">
+                                        <li>Không có network overhead (~0ms inter-agent)</li>
+                                        <li>Dễ debug — single call stack</li>
+                                        <li>Shared memory state, no serialization</li>
+                                        <li>Dễ test với pytest</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.25); border-radius:8px; padding:1rem; font-size:0.8rem;">
+                                    <div style="color:var(--accent-rose); font-weight:600; margin-bottom:0.5rem;">❌ Hạn chế</div>
+                                    <ul style="color:var(--text-secondary); padding-left:1.2rem; line-height:1.8;">
+                                        <li>Single point of failure — 1 agent crash = toàn bộ sập</li>
+                                        <li>Không thể scale agent riêng lẻ</li>
+                                        <li>Không thể dùng khác ngôn ngữ/runtime</li>
+                                        <li>Khó deploy lên cloud microservices</li>
+                                    </ul>
+                                </div>
+                                <div style="background:rgba(15,23,42,0.6); border:1px solid var(--border-color); border-radius:8px; padding:0.75rem; margin-top:0.75rem;">
+                                    <div style="color:var(--text-secondary); font-size:0.7rem; margin-bottom:0.35rem;">Entry point</div>
+                                    <code style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-cyan);">stages/stage_4_multi_agent/main.py</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step-by-step Stage 4 -->
+                    <div class="card">
+                        <h3 class="card-title">📋 Luồng thực thi Stage 4 — Từng bước</h3>
+                        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-emerald);">
+                                <div style="font-size:1.5rem; line-height:1;">1️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">User gọi <code style="color:var(--accent-cyan); font-size:0.85rem;">graph.ainvoke()</code></div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">LangGraph nhận dict input <code>{question, context_id, trace_id}</code> và bắt đầu walk qua nodes.</div>
+                                    <div class="console" style="max-height:80px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[LangGraph]</span> Starting graph.ainvoke() with state: {question: "...", delegation_depth: 0}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-cyan);">
+                                <div style="font-size:1.5rem; line-height:1;">2️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Node <code style="color:var(--accent-cyan); font-size:0.85rem;">analyze_and_route</code> — LLM routing call</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        Law Agent gọi <code>get_fast_llm().ainvoke()</code> với system prompt yêu cầu JSON routing. LLM trả về <code>{law_analysis, needs_tax, needs_compliance}</code>.
+                                    </div>
+                                    <div class="console" style="max-height:100px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[LawAgent]</span> Sending routing prompt to LLM (max_tokens=300)...</div>
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[LLM]</span> {"law_analysis":"Tax evasion violates IRC §7201...","needs_tax":true,"needs_compliance":true}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-purple);">
+                                <div style="font-size:1.5rem; line-height:1;">3️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">LangGraph <code style="color:var(--accent-cyan); font-size:0.85rem;">Send()</code> — parallel dispatch trong same process</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        <code>route_to_subagents()</code> trả về <code>[Send("call_tax", state), Send("call_compliance", state)]</code>. LangGraph chạy cả 2 node <strong>đồng thời</strong> bằng asyncio tasks — không cần HTTP.
+                                    </div>
+                                    <div class="console" style="max-height:100px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[Router]</span> Parallel Send dispatched: ["call_tax", "call_compliance"]</div>
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[TaxNode]</span> TaxAgent LLM call started (in-process thread)...</div>
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[CompNode]</span> ComplianceAgent LLM call started (in-process thread)...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-amber);">
+                                <div style="font-size:1.5rem; line-height:1;">4️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Node <code style="color:var(--accent-cyan); font-size:0.85rem;">aggregate()</code> — merge kết quả bằng template</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        Sau khi cả 2 parallel branches hoàn thành, LangGraph reducer <code>_last_wins</code> merge state. Node <code>aggregate()</code> dùng <strong>f-string template</strong> (không gọi LLM) để format final answer — tiết kiệm ~10s so với version cũ.
+                                    </div>
+                                    <div class="console" style="max-height:80px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[Stage4]</span> <span class="console-tag">[Aggregate]</span> Tax+Compliance results merged. Formatting with template (no LLM call). final_answer ready.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Data flow diagram Stage 4 -->
+                    <div class="card">
+                        <h3 class="card-title">🗂️ Data Flow — LawState qua các nodes</h3>
+                        <div style="overflow-x:auto;">
+                            <table class="matrix">
+                                <thead>
+                                    <tr>
+                                        <th>Node</th>
+                                        <th>Input từ State</th>
+                                        <th>Output vào State</th>
+                                        <th>LLM Call?</th>
+                                        <th>Thời gian</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code style="color:var(--accent-cyan)">analyze_and_route</code></td>
+                                        <td><code>question, depth</code></td>
+                                        <td><code>law_analysis, needs_tax, needs_compliance</code></td>
+                                        <td><span style="color:var(--accent-amber);">✅ fast LLM</span></td>
+                                        <td>~3–5s</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code style="color:var(--accent-purple)">call_tax</code> (parallel)</td>
+                                        <td><code>question, context_id</code></td>
+                                        <td><code>tax_result</code></td>
+                                        <td><span style="color:var(--accent-amber);">✅ LLM</span></td>
+                                        <td>~12–15s</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code style="color:var(--accent-purple)">call_compliance</code> (parallel)</td>
+                                        <td><code>question, context_id</code></td>
+                                        <td><code>compliance_result</code></td>
+                                        <td><span style="color:var(--accent-amber);">✅ LLM</span></td>
+                                        <td>~12–15s</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code style="color:var(--accent-emerald)">aggregate</code></td>
+                                        <td><code>law_analysis, tax_result, compliance_result</code></td>
+                                        <td><code>final_answer</code></td>
+                                        <td><span style="color:var(--accent-emerald);">❌ template</span></td>
+                                        <td>~0ms</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 5 Deep-Dive -->
+            <div id="eng-s5" style="display:none;">
+                <div style="display:grid; grid-template-columns:1fr; gap:1.5rem;">
+
+                    <!-- Overview -->
+                    <div class="card" style="border-color: rgba(6,182,212,0.3);">
+                        <h3 class="card-title" style="color: var(--accent-cyan);">🌐 Kiến trúc Stage 5: Distributed A2A Microservices</h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+                            <div>
+                                <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem;">
+                                    Stage 5 triển khai mỗi agent như một <strong>FastAPI microservice độc lập</strong> giao tiếp qua 
+                                    <strong>Google A2A Protocol</strong> (JSON-RPC 2.0 over HTTP). Agents tìm nhau qua 
+                                    <strong>Service Registry</strong>.
+                                </p>
+                                <div style="display:flex; flex-direction:column; gap:0.5rem; font-family:var(--font-mono); font-size:0.78rem;">
+                                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0.6rem; background:rgba(6,182,212,0.08); border-radius:6px;">
+                                        <span style="color:var(--text-secondary);">Registry</span><span style="color:var(--accent-cyan);">:10000</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0.6rem; background:rgba(6,182,212,0.08); border-radius:6px;">
+                                        <span style="color:var(--text-secondary);">Customer Agent</span><span style="color:var(--accent-cyan);">:10100</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0.6rem; background:rgba(6,182,212,0.08); border-radius:6px;">
+                                        <span style="color:var(--text-secondary);">Law Agent</span><span style="color:var(--accent-cyan);">:10101</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0.6rem; background:rgba(6,182,212,0.08); border-radius:6px;">
+                                        <span style="color:var(--text-secondary);">Tax Agent</span><span style="color:var(--accent-cyan);">:10102</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0.6rem; background:rgba(6,182,212,0.08); border-radius:6px;">
+                                        <span style="color:var(--text-secondary);">Compliance Agent</span><span style="color:var(--accent-cyan);">:10103</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.25); border-radius:8px; padding:1rem; font-size:0.8rem; margin-bottom:0.75rem;">
+                                    <div style="color:var(--accent-cyan); font-weight:600; margin-bottom:0.5rem;">🔑 A2A Protocol — Key Concepts</div>
+                                    <ul style="color:var(--text-secondary); padding-left:1.2rem; line-height:1.9;">
+                                        <li><strong>Agent Card</strong>: manifest tại <code>/.well-known/agent.json</code></li>
+                                        <li><strong>context_id</strong>: nhận dạng conversation session</li>
+                                        <li><strong>trace_id</strong>: distributed tracing toàn pipeline</li>
+                                        <li><strong>Task lifecycle</strong>: submitted → working → completed</li>
+                                    </ul>
+                                </div>
+                                <div style="background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.25); border-radius:8px; padding:1rem; font-size:0.8rem;">
+                                    <div style="color:var(--accent-purple); font-weight:600; margin-bottom:0.5rem;">⚡ Optimizations áp dụng</div>
+                                    <ul style="color:var(--text-secondary); padding-left:1.2rem; line-height:1.9;">
+                                        <li>Persistent <code>httpx.AsyncClient</code> (connection pool)</li>
+                                        <li>Agent card cache (không re-fetch manifest)</li>
+                                        <li>Registry discover cache TTL=60s</li>
+                                        <li>LLM singleton qua <code>@lru_cache</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step-by-step Stage 5 with real code -->
+                    <div class="card">
+                        <h3 class="card-title">📋 Luồng thực thi Stage 5 — Kèm thực tế HTTP logs</h3>
+                        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-cyan);">
+                                <div style="font-size:1.5rem; line-height:1;">1️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Client gửi JSON-RPC đến Customer Agent <code style="color:var(--accent-cyan); font-size:0.82rem;">POST http://localhost:10100/</code></div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        <code>test_client.py</code> fetch <code>/.well-known/agent.json</code> để lấy AgentCard, build <code>SendMessageRequest</code> với <code>context_id</code> để maintain session.
+                                    </div>
+                                    <div class="console" style="max-height:100px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[16:37:40]</span> <span class="console-tag">[client]</span> GET http://localhost:10100/.well-known/agent.json → 200 OK</div>
+                                        <div class="console-line"><span class="console-time">[16:37:40]</span> <span class="console-tag">[client]</span> POST http://localhost:10100/ (SendMessageRequest, context_id=full-bench-ctx-001)</div>
+                                        <div class="console-line"><span class="console-time">[16:37:40]</span> <span class="console-tag">[customer_agent]</span> CustomerAgent executing | task=... trace=... depth=0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-purple);">
+                                <div style="font-size:1.5rem; line-height:1;">2️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Customer Agent — LLM classify + delegate decision</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        <code>build_graph()</code> tạo ReAct agent với <code>MemorySaver</code> checkpointer. LLM phân tích câu hỏi, quyết định gọi tool <code>delegate_to_legal_agent()</code>. Nếu thiếu thông tin → hỏi lại user trước.
+                                    </div>
+                                    <div class="console" style="max-height:100px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[16:37:41]</span> <span class="console-tag">[customer_agent]</span> HTTP Request: POST https://openrouter.ai/api/v1/chat/completions → 200 OK</div>
+                                        <div class="console-line"><span class="console-time">[16:37:42]</span> <span class="console-tag">[customer_agent]</span> LLM → ToolCall: delegate_to_legal_agent(question="A US-based C-corp...")</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-emerald);">
+                                <div style="font-size:1.5rem; line-height:1;">3️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Service Discovery — Registry lookup (cached)</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        <code>discover("legal_question")</code> check in-memory cache trước (TTL 60s). Nếu miss → <code>GET http://localhost:10000/discover/legal_question</code>. Kết quả <code>{endpoint: "http://localhost:10101"}</code> được cached.
+                                    </div>
+                                    <div class="console" style="max-height:80px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[16:37:42]</span> <span class="console-tag">[registry_client]</span> Cache MISS for 'legal_question'. Fetching from registry...</div>
+                                        <div class="console-line"><span class="console-time">[16:37:42]</span> <span class="console-tag">[registry_client]</span> Resolved: http://localhost:10101 → cached for 60s</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-amber);">
+                                <div style="font-size:1.5rem; line-height:1;">4️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Law Agent — Routing + Parallel dispatch</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        Law Agent nhận request (depth=1), gọi <code>get_fast_llm()</code> để phân tích và routing. LangGraph Send() dispatch đồng thời 2 A2A calls: Tax Agent (10102) và Compliance Agent (10103). Cả 2 chạy song song qua <code>asyncio.gather</code> ngầm định.
+                                    </div>
+                                    <div class="console" style="max-height:120px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[16:37:43]</span> <span class="console-tag">[law_agent]</span> LawAgent executing | trace=... depth=1. Routing: needs_tax=True, needs_compliance=True</div>
+                                        <div class="console-line"><span class="console-time">[16:37:43]</span> <span class="console-tag">[law_agent]</span> Delegating to Tax Agent (10102) and Compliance Agent (10103) in parallel...</div>
+                                        <div class="console-line"><span class="console-time">[16:37:43]</span> <span class="console-tag">[a2a_client]</span> Agent card cache HIT for http://localhost:10102 ✓</div>
+                                        <div class="console-line"><span class="console-time">[16:37:43]</span> <span class="console-tag">[a2a_client]</span> Agent card cache HIT for http://localhost:10103 ✓</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-rose);">
+                                <div style="font-size:1.5rem; line-height:1;">5️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Tax Agent + Compliance Agent — Parallel LLM responses</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        Tax Agent (port 10102): <code>create_react_agent</code> không có tools, answer thuần từ LLM. Compliance Agent tương tự. Cả 2 trả về qua A2A Task artifact. Law Agent nhận kết quả từ cả 2, merge bằng string template (không LLM).
+                                    </div>
+                                    <div class="console" style="max-height:100px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[16:37:55]</span> <span class="console-tag">[tax_agent]</span> Tax Agent returned 412 chars ✓</div>
+                                        <div class="console-line"><span class="console-time">[16:37:56]</span> <span class="console-tag">[compliance_agent]</span> Compliance Agent returned 597 chars ✓</div>
+                                        <div class="console-line"><span class="console-time">[16:37:56]</span> <span class="console-tag">[law_agent]</span> aggregate(): template merge done. No LLM call needed.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="eng-step" style="display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:start; padding:1rem; background:rgba(15,23,42,0.5); border-radius:10px; border-left:3px solid var(--accent-cyan);">
+                                <div style="font-size:1.5rem; line-height:1;">6️⃣</div>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.95rem;">Customer Agent format + return response</div>
+                                    <div style="color:var(--text-secondary); font-size:0.82rem; margin:0.4rem 0;">
+                                        Customer Agent nhận <code>final_answer</code> từ Law Agent qua A2A, gọi LLM lần cuối để format nicely (optional), rồi <code>updater.complete()</code> gửi Task artifact về cho client. Tổng: <strong>27s end-to-end</strong>.
+                                    </div>
+                                    <div class="console" style="max-height:80px; padding:0.6rem; font-size:0.72rem; margin-top:0.5rem;">
+                                        <div class="console-line"><span class="console-time">[16:38:07]</span> <span class="console-tag">[customer_agent]</span> Task completed. Artifact 'legal_response' (3071 chars) → 200 OK</div>
+                                        <div class="console-line"><span class="console-time">[16:38:07]</span> <span class="console-tag">[client]</span> ✅ Total latency: 27.00s</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Fault Tolerance explanation -->
+                    <div class="card" style="border-color: rgba(244,63,94,0.2);">
+                        <h3 class="card-title" style="color: var(--accent-rose);">⚡ Fault Tolerance — Khi Tax Agent sập</h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+                            <div>
+                                <div style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:1rem;">
+                                    Stage 5 có khả năng <strong>tự phục hồi</strong> khi một specialist agent lỗi. Law Agent catch exception từ <code>call_tax</code> và điền fallback message vào state thay vì crash toàn bộ pipeline.
+                                </div>
+                                <div class="console" style="max-height:120px; padding:0.6rem; font-size:0.72rem;">
+                                    <div class="console-line"><span class="console-time">[FAULT]</span> <span style="color:var(--accent-rose);">[law_agent]</span> call_tax: ConnectError: [Errno 61] Connection refused :10102</div>
+                                    <div class="console-line"><span class="console-time">[FAULT]</span> <span class="console-tag">[law_agent]</span> call_tax failed → tax_result = "[Tax analysis unavailable]"</div>
+                                    <div class="console-line"><span class="console-time">[FAULT]</span> <span class="console-tag">[law_agent]</span> Compliance result OK. Continuing aggregate()...</div>
+                                    <div class="console-line"><span class="console-time">[FAULT]</span> <span class="console-tag">[law_agent]</span> ✓ Partial response returned (compliance only)</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.2); border-radius:8px; padding:1rem; font-size:0.82rem;">
+                                    <div style="font-weight:600; margin-bottom:0.75rem; color:var(--accent-rose);">Stage 4 vs Stage 5 khi có lỗi</div>
+                                    <table style="width:100%; font-size:0.78rem; border-collapse:collapse;">
+                                        <tr style="border-bottom:1px solid var(--border-color);">
+                                            <td style="padding:0.4rem; color:var(--text-secondary);">Tax Agent lỗi</td>
+                                            <td style="padding:0.4rem; color:var(--accent-rose);">Stage 4: ❌ Exception propagate lên main</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:0.4rem; color:var(--text-secondary);"> </td>
+                                            <td style="padding:0.4rem; color:var(--accent-emerald);">Stage 5: ✅ Caught, fallback, continues</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- SECTION: Latency Before vs After Optimization                    -->
+        <!-- ================================================================ -->
+        <div style="margin-top: 3rem;">
+            <div style="text-align:center; margin-bottom: 2rem;">
+                <h2 style="font-size:2rem; font-weight:800; background: linear-gradient(135deg, #f59e0b, #f43f5e); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+                    ⚡ Financial Agent Latency — Trước & Sau Optimization
+                </h2>
+                <p style="color: var(--text-secondary); margin-top:0.5rem;">
+                    Đo thực tế qua <code style="color:var(--accent-cyan);">benchmark.py</code> — câu hỏi tax evasion đầy đủ context (kích hoạt full agent chain)
+                </p>
+            </div>
+
+            <!-- Big numbers -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+                <div class="card" style="border-color: rgba(244,63,94,0.4); text-align:center; padding:2rem;">
+                    <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem; letter-spacing:0.1em; text-transform:uppercase;">Trước Optimization</div>
+                    <div style="font-size:4rem; font-weight:800; color: var(--accent-rose); line-height:1; font-family:var(--font-mono);">~60s</div>
+                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.5rem;">5 LLM calls + 4 HTTP round-trips (per request)</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center; margin-top:1rem;">
+                        <span style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-rose);">LLM tạo mới mỗi call</span>
+                        <span style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-rose);">Agent card re-fetch</span>
+                        <span style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-rose);">aggregate() LLM call</span>
+                        <span style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-rose);">TCP reconnect mỗi request</span>
+                    </div>
+                </div>
+                <div class="card" style="border-color: rgba(16,185,129,0.4); text-align:center; padding:2rem;">
+                    <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem; letter-spacing:0.1em; text-transform:uppercase;">Sau Optimization</div>
+                    <div style="font-size:4rem; font-weight:800; color: var(--accent-emerald); line-height:1; font-family:var(--font-mono);" id="latency-counter">27s</div>
+                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.5rem;">3 LLM calls (parallel 2) + cached connections</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center; margin-top:1rem;">
+                        <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-emerald);">@lru_cache LLM singleton</span>
+                        <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-emerald);">Agent card cached</span>
+                        <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-emerald);">aggregate() → template</span>
+                        <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.72rem; color:var(--accent-emerald);">Persistent TCP pool</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bar Chart Visualization -->
+            <div class="card" style="margin-bottom:1.5rem;">
+                <h3 class="card-title">📊 Breakdown chi tiết theo từng bước — Gantt Timeline</h3>
+
+                <!-- Before -->
+                <div style="margin-bottom:1.5rem;">
+                    <div style="font-size:0.85rem; color:var(--accent-rose); font-weight:600; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span>❌ TRƯỚC (total ~60s)</span>
+                    </div>
+                    <div class="latency-timeline" id="before-timeline">
+                        <div class="lat-row" data-delay="0">
+                            <div class="lat-label">Customer LLM #1</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#f43f5e,#fb923c);" data-w="3.3" data-max="60"></div></div>
+                            <div class="lat-val">~2s</div>
+                        </div>
+                        <div class="lat-row" data-delay="100">
+                            <div class="lat-label">Registry lookup ×4</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#fb923c,#fbbf24);" data-w="1.6" data-max="60"></div></div>
+                            <div class="lat-val">~1s</div>
+                        </div>
+                        <div class="lat-row" data-delay="200">
+                            <div class="lat-label">Agent card fetch ×3</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#fb923c,#fbbf24);" data-w="1.6" data-max="60"></div></div>
+                            <div class="lat-val">~1s</div>
+                        </div>
+                        <div class="lat-row" data-delay="300">
+                            <div class="lat-label">Law Agent routing LLM #2</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#f43f5e,#fb923c);" data-w="16.6" data-max="60"></div></div>
+                            <div class="lat-val">~10s</div>
+                        </div>
+                        <div class="lat-row" data-delay="400">
+                            <div class="lat-label">Tax LLM #3 ‖ Compliance LLM #4</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#f43f5e,#e11d48);" data-w="25" data-max="60"></div></div>
+                            <div class="lat-val">~15s</div>
+                        </div>
+                        <div class="lat-row" data-delay="500">
+                            <div class="lat-label">Aggregate LLM #5</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#f43f5e,#fb923c);" data-w="20" data-max="60"></div></div>
+                            <div class="lat-val">~12s</div>
+                        </div>
+                        <div class="lat-row" data-delay="600">
+                            <div class="lat-label">TCP handshakes (no pool)</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#fb923c,#fbbf24);" data-w="3.3" data-max="60"></div></div>
+                            <div class="lat-val">~2s</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- After -->
+                <div>
+                    <div style="font-size:0.85rem; color:var(--accent-emerald); font-weight:600; margin-bottom:0.75rem;">✅ SAU OPTIMIZATION (total ~27s)</div>
+                    <div class="latency-timeline" id="after-timeline">
+                        <div class="lat-row" data-delay="0">
+                            <div class="lat-label">Customer LLM #1</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#06b6d4);" data-w="3.3" data-max="60"></div></div>
+                            <div class="lat-val">~2s</div>
+                        </div>
+                        <div class="lat-row" data-delay="100">
+                            <div class="lat-label">Registry (cached TTL 60s)</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#06b6d4);" data-w="0.16" data-max="60"></div></div>
+                            <div class="lat-val">~0ms</div>
+                        </div>
+                        <div class="lat-row" data-delay="200">
+                            <div class="lat-label">Agent card (cached)</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#06b6d4);" data-w="0.16" data-max="60"></div></div>
+                            <div class="lat-val">~0ms</div>
+                        </div>
+                        <div class="lat-row" data-delay="300">
+                            <div class="lat-label">Law Agent fast LLM (300tok)</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#06b6d4);" data-w="6.6" data-max="60"></div></div>
+                            <div class="lat-val">~4s</div>
+                        </div>
+                        <div class="lat-row" data-delay="400">
+                            <div class="lat-label">Tax LLM #2 ‖ Compliance LLM #3</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#34d399);" data-w="21.6" data-max="60"></div></div>
+                            <div class="lat-val">~13s</div>
+                        </div>
+                        <div class="lat-row" data-delay="500">
+                            <div class="lat-label">aggregate() — f-string template</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#06b6d4);" data-w="0.16" data-max="60"></div></div>
+                            <div class="lat-val">~0ms</div>
+                        </div>
+                        <div class="lat-row" data-delay="600">
+                            <div class="lat-label">TCP pool reuse</div>
+                            <div class="lat-bar-bg"><div class="lat-bar" style="width:0%; background:linear-gradient(90deg,#10b981,#06b6d4);" data-w="0.83" data-max="60"></div></div>
+                            <div class="lat-val">~0.5s</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimization table -->
+            <div class="card">
+                <h3 class="card-title">🔧 6 Optimization đã thực hiện</h3>
+                <table class="matrix">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Optimization</th>
+                            <th>File thay đổi</th>
+                            <th>Kỹ thuật</th>
+                            <th>Tiết kiệm</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span style="background:rgba(16,185,129,0.15); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem; color:var(--accent-emerald);">1</span></td>
+                            <td><strong>LLM Singleton Cache</strong></td>
+                            <td><code style="font-size:0.75rem; color:var(--accent-cyan);">common/llm.py</code></td>
+                            <td><code style="font-size:0.75rem;">@lru_cache(maxsize=1)</code></td>
+                            <td><span style="color:var(--accent-emerald);">~50ms</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="background:rgba(16,185,129,0.15); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem; color:var(--accent-emerald);">2</span></td>
+                            <td><strong>Persistent HTTP Client</strong></td>
+                            <td><code style="font-size:0.75rem; color:var(--accent-cyan);">common/a2a_client.py</code></td>
+                            <td>Module-level <code style="font-size:0.75rem;">httpx.AsyncClient</code> + connection pool</td>
+                            <td><span style="color:var(--accent-emerald);">~200–400ms</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="background:rgba(16,185,129,0.15); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem; color:var(--accent-emerald);">3</span></td>
+                            <td><strong>Agent Card Cache</strong></td>
+                            <td><code style="font-size:0.75rem; color:var(--accent-cyan);">common/a2a_client.py</code></td>
+                            <td>Dict cache, skip re-fetch <code style="font-size:0.75rem;">/.well-known/agent.json</code></td>
+                            <td><span style="color:var(--accent-emerald);">~300ms/call</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="background:rgba(16,185,129,0.15); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem; color:var(--accent-emerald);">4</span></td>
+                            <td><strong>Registry Discover Cache</strong></td>
+                            <td><code style="font-size:0.75rem; color:var(--accent-cyan);">common/registry_client.py</code></td>
+                            <td>TTL=60s in-memory cache, avoid HTTP per-call</td>
+                            <td><span style="color:var(--accent-emerald);">~100ms/call</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="background:rgba(245,158,11,0.2); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem; color:var(--accent-amber);">5</span></td>
+                            <td><strong>Bỏ LLM trong aggregate()</strong></td>
+                            <td><code style="font-size:0.75rem; color:var(--accent-cyan);">law_agent/graph.py</code></td>
+                            <td>Replace LLM call bằng f-string Markdown template</td>
+                            <td><span style="color:var(--accent-amber); font-weight:bold;">~8–15s 🎯</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="background:rgba(245,158,11,0.2); border-radius:4px; padding:0.1rem 0.4rem; font-size:0.75rem; color:var(--accent-amber);">6</span></td>
+                            <td><strong>Fast LLM cho routing</strong></td>
+                            <td><code style="font-size:0.75rem; color:var(--accent-cyan);">law_agent/graph.py</code></td>
+                            <td><code style="font-size:0.75rem;">get_fast_llm()</code>: temp=0, max_tokens=300</td>
+                            <td><span style="color:var(--accent-amber); font-weight:bold;">~5–10s 🎯</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:1.25rem; display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; text-align:center;">
+                    <div style="background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.2); border-radius:10px; padding:1rem;">
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">LLM Calls Trước</div>
+                        <div style="font-size:2rem; font-weight:800; color:var(--accent-rose); font-family:var(--font-mono);">5</div>
+                    </div>
+                    <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:1rem;">
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">LLM Calls Sau</div>
+                        <div style="font-size:2rem; font-weight:800; color:var(--accent-emerald); font-family:var(--font-mono);">3</div>
+                    </div>
+                    <div style="background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.2); border-radius:10px; padding:1rem;">
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">Tổng giảm</div>
+                        <div style="font-size:2rem; font-weight:800; color:var(--accent-cyan); font-family:var(--font-mono);">55%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Latency bar chart */
+        .lat-row {
+            display: grid;
+            grid-template-columns: 200px 1fr 60px;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        .lat-label {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lat-bar-bg {
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            height: 22px;
+            overflow: hidden;
+        }
+        .lat-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .lat-val {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+        @media (max-width: 700px) {
+            .lat-row { grid-template-columns: 130px 1fr 50px; }
+            .lat-label { font-size: 0.65rem; }
+        }
+    </style>
+
+    <script>
+        // Engine switcher for AI Engineer section
+        function showEngTab(tab) {
+            document.getElementById('eng-s4').style.display = tab === 's4' ? 'block' : 'none';
+            document.getElementById('eng-s5').style.display = tab === 's5' ? 'block' : 'none';
+            document.getElementById('eng-btn-s4').classList.toggle('active', tab === 's4');
+            document.getElementById('eng-btn-s5').classList.toggle('active', tab === 's5');
+            if (tab === 's4') {
+                document.getElementById('eng-btn-s4').style.borderColor = 'var(--accent-emerald)';
+                document.getElementById('eng-btn-s5').style.borderColor = 'var(--border-color)';
+            } else {
+                document.getElementById('eng-btn-s5').style.borderColor = 'var(--accent-cyan)';
+                document.getElementById('eng-btn-s4').style.borderColor = 'var(--border-color)';
+            }
+        }
+
+        // Latency bar animation on scroll
+        function animateBars(timelineId) {
+            const rows = document.querySelectorAll(`#${timelineId} .lat-row`);
+            rows.forEach((row) => {
+                const delay = parseInt(row.dataset.delay || 0);
+                const bar = row.querySelector('.lat-bar');
+                const w = parseFloat(bar.dataset.w);
+                const max = parseFloat(bar.dataset.max);
+                setTimeout(() => {
+                    bar.style.width = `${(w / max) * 100}%`;
+                }, delay);
+            });
+        }
+
+        // Intersection Observer to trigger animation when scrolled into view
+        const latencySection = document.getElementById('before-timeline');
+        let barsAnimated = false;
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !barsAnimated) {
+                    barsAnimated = true;
+                    animateBars('before-timeline');
+                    setTimeout(() => animateBars('after-timeline'), 400);
+                }
+            });
+        }, { threshold: 0.2 });
+        if (latencySection) observer.observe(latencySection);
+    </script>
+
+    <script>
+        let currentStage = 5;
+        let activeStep = 0;
+        let isTaxFailed = false;
+
+        const steps = {
+            4: [
+                {
+                    title: "User requests advice",
+                    desc: "User inputs a query in-process. The main thread calls the entry point node in Python.",
+                    activeNodes: ["node-user", "node-customer"],
+                    activePaths: ["path-user-customer"],
+                    log: "User invoked main() stategraph execution in python stages/stage_4_milti_agent/main.py"
+                },
+                {
+                    title: "Lead Attorney (Law Agent)",
+                    desc: "StateGraph initiates law_analysis. Updates LegalState dictionary context directly in memory.",
+                    activeNodes: ["node-law"],
+                    activePaths: ["path-customer-law"],
+                    log: "Entering node: analyze_law. Executing LLM contract & tort analysis."
+                },
+                {
+                    title: "Check routing conditions",
+                    desc: "Routing node check_routing evaluates the question keywords and triggers concurrent transitions.",
+                    activeNodes: ["node-law"],
+                    activePaths: [],
+                    log: "Node check_routing: needs_tax=True, needs_compliance=True."
+                },
+                {
+                    title: "Execute specialist sub-agents",
+                    desc: "LangGraph Send() API executes tax_agent and compliance_agent in parallel threads.",
+                    activeNodes: ["node-tax", "node-compliance"],
+                    activePaths: ["path-law-tax", "path-law-compliance"],
+                    log: "Parallel Send dispatched: call_tax_specialist and call_compliance_specialist running."
+                },
+                {
+                    title: "Aggregate Results",
+                    desc: "Reducer values from tax and compliance analyses are aggregated in aggregate_results node.",
+                    activeNodes: ["node-law"],
+                    activePaths: [],
+                    log: "Entering node: aggregate. Synthesizing sections back in main process thread."
+                },
+                {
+                    title: "Response returned",
+                    desc: "Final State dictionary output returned synchronously to user interface.",
+                    activeNodes: ["node-user"],
+                    activePaths: ["path-user-customer"],
+                    log: "Completed graph execution. Final Answer delivered successfully."
+                }
+            ],
+            5: [
+                {
+                    title: "User initiates HTTP request",
+                    desc: "Request sent to Customer Agent at http://localhost:10100. Starts distributed tracing trace_id: c964fd1f-f2fb.",
+                    activeNodes: ["node-user", "node-customer"],
+                    activePaths: ["path-user-customer"],
+                    log: "CustomerAgent executing | task=e92c context=7016 trace=c964fd1f-f2fb-4afe depth=0"
+                },
+                {
+                    title: "Discover & Delegate to Law Agent",
+                    desc: "Customer agent calls Registry on port 10000, resolves Law Agent port 10101 dynamically, and forwards JSON-RPC.",
+                    activeNodes: ["node-registry", "node-law"],
+                    activePaths: ["path-customer-registry", "path-customer-law"],
+                    log: "Discovered 'law-agent' at http://localhost:10101. HTTP POST /.well-known/agent-card.json 200 OK"
+                },
+                {
+                    title: "Law Agent executes and routes",
+                    desc: "Law Agent evaluates question using analyze_and_route. Decides to route to Tax & Compliance specialists.",
+                    activeNodes: ["node-law"],
+                    activePaths: ["path-law-registry"],
+                    log: "LawAgent executing | trace=c964fd1f-f2fb depth=1. Routing decision: needs_tax=True, needs_compliance=True"
+                },
+                {
+                    title: "Parallel Specialist Querying",
+                    desc: "Law Agent queries Registry for specialists, then dispatches asynchronous POST calls in parallel to ports 10102 and 10103.",
+                    activeNodes: ["node-tax", "node-compliance"],
+                    activePaths: ["path-law-tax", "path-law-compliance"],
+                    log: "Dispatched A2A delegate to Tax Agent (10102) and Compliance Agent (10103) with trace propagation."
+                },
+                {
+                    title: "Aggregate & Self-heal if necessary",
+                    desc: "If Tax Agent is failed, Law Agent handles Exception, inputs warning text, and continues compilation.",
+                    activeNodes: ["node-law"],
+                    activePaths: [],
+                    log: "Tax Agent returned payload (or failure caught). Compiling compliance and tax analyses in Law Agent."
+                },
+                {
+                    title: "Formulate final response",
+                    desc: "Customer Agent formats final payload and returns a clean advisory report to the User Client.",
+                    activeNodes: ["node-user"],
+                    activePaths: ["path-user-customer"],
+                    log: "Customer Agent returned final consolidated advice. Trace c964fd1f-f2fb successfully closed."
+                }
+            ]
+        };
+
+        function setStage(stage) {
+            currentStage = stage;
+            document.getElementById("btn-stage4").classList.toggle("active", stage === 4);
+            document.getElementById("btn-stage5").classList.toggle("active", stage === 5);
+            
+            // Toggle process boundary
+            const boundary = document.getElementById("process-boundary");
+            if (stage === 4) {
+                boundary.style.display = "block";
+                boundary.style.left = "160px";
+                boundary.style.top = "70px";
+                boundary.style.width = "720px";
+                boundary.style.height = "380px";
+                document.getElementById("node-registry").style.display = "none";
+                document.getElementById("topology-title").innerText = "Stage 4: In-Process Orchestration Boundary";
+            } else {
+                boundary.style.display = "none";
+                document.getElementById("node-registry").style.display = "block";
+                document.getElementById("topology-title").innerText = "Stage 5: Distributed Agent-to-Agent Architecture";
+            }
+
+            resetStep();
+        }
+
+        function toggleFaultSimulation() {
+            isTaxFailed = !isTaxFailed;
+            const taxNode = document.getElementById("node-tax");
+            const taxBadge = document.getElementById("tax-badge");
+            
+            taxNode.classList.toggle("down", isTaxFailed);
+            if (isTaxFailed) {
+                taxBadge.innerHTML = '<span class="node-status" style="background-color: var(--accent-rose);"></span>Failed';
+                addLogLine("CRITICAL", "tax-agent offline. Connection Refused on port 10102.");
+            } else {
+                taxBadge.innerHTML = '<span class="node-status"></span>Active';
+                addLogLine("INFO", "tax-agent recovered and registered with Registry.");
+            }
+        }
+
+        function resetStep() {
+            activeStep = 0;
+            updateUI();
+            const console = document.getElementById("console");
+            console.innerHTML = `<div class="console-line"><span class="console-time">[${new Date().toLocaleTimeString()}]</span> Tracing restarted. Click 'Next' to trigger flow...</div>`;
+        }
+
+        function nextStep() {
+            if (activeStep < steps[currentStage].length - 1) {
+                activeStep++;
+            } else {
+                activeStep = 0;
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            const currentSteps = steps[currentStage];
+            const currentStepData = currentSteps[activeStep];
+            
+            // Stepper metadata
+            document.getElementById("step-counter").innerText = `Step ${activeStep} / ${currentSteps.length - 1}`;
+            document.getElementById("step-title").innerText = currentStepData.title;
+            
+            // Check if tax agent is down in Step 4 description
+            if (isTaxFailed && activeStep === 4 && currentStage === 5) {
+                document.getElementById("step-desc").innerText = "Fault Tolerance Active: Tax Agent request threw httpcore.ConnectError, caught by Law Agent. Result compiled with fallback advice.";
+            } else {
+                document.getElementById("step-desc").innerText = currentStepData.desc;
+            }
+
+            // Reset node active states
+            const allNodes = document.querySelectorAll(".node-agent");
+            allNodes.forEach(node => node.classList.remove("active"));
+
+            // Set active nodes
+            currentStepData.activeNodes.forEach(nodeId => {
+                document.getElementById(nodeId).classList.add("active");
+            });
+
+            // Handle svg connections stroke/pulse
+            const allPaths = document.querySelectorAll("svg.network-lines path");
+            allPaths.forEach(path => {
+                path.removeAttribute("stroke");
+                path.removeAttribute("class");
+            });
+
+            currentStepData.activePaths.forEach(pathId => {
+                const path = document.getElementById(pathId);
+                if (path) {
+                    path.setAttribute("stroke", "var(--accent-cyan)");
+                    path.setAttribute("class", "packet");
+                }
+            });
+
+            // Append Log
+            let logText = currentStepData.log;
+            if (isTaxFailed && activeStep === 3 && currentStage === 5) {
+                logText = "Law Agent attempts to contact Tax Agent... ERROR: Connection Refused. Dispatching compliance query in parallel.";
+            }
+            if (isTaxFailed && activeStep === 4 && currentStage === 5) {
+                logText = "LawAgent executing aggregate: call_tax failed. tax_result populated with fallback unavailable error string. Synthesizing final answer.";
+            }
+            addLogLine(currentStage === 5 ? "STAGE5" : "STAGE4", logText);
+        }
+
+        function addLogLine(tag, msg) {
+            const console = document.getElementById("console");
+            const time = new Date().toLocaleTimeString();
+            console.innerHTML += `<div class="console-line"><span class="console-time">[${time}]</span> <span class="console-tag">[${tag}]</span> ${msg}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        // Initialize
+        setStage(5);
+    </script>
+</body>
+</html>

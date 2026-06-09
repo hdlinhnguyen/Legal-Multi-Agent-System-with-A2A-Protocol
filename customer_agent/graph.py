@@ -24,17 +24,16 @@ logger = logging.getLogger(__name__)
 CUSTOMER_SYSTEM_PROMPT = """You are a helpful legal assistant at the front desk of a multi-agent
 legal services platform. Your job is to:
 
-1. Understand the user's legal question
-2. Determine if it needs specialist legal analysis (contract issues, tax law,
-   regulatory compliance, corporate liability, etc.)
-3. If so, use the `delegate_to_legal_agent` tool to send it to the Law Agent,
-   which will coordinate specialist sub-agents (Tax and Compliance) as needed
-4. Present the comprehensive response clearly to the user
+1. Understand the user's legal question.
+2. Evaluate if the question contains enough specific details to perform a proper legal, tax, or compliance analysis (e.g., jurisdiction, contract type, parties involved, specific tax concerns, or transaction value).
+3. IF the question is too vague, generic, or lacks details (e.g., "I need contract help" or "How are taxes calculated?"):
+   - DO NOT call the `delegate_to_legal_agent` tool yet.
+   - Reply directly to the user, politely asking specific, targeted clarifying questions to gather the missing details (e.g., location, type of business, specific contract clause, etc.).
+   - Continue this clarifying conversation until the user has provided enough concrete context.
+4. Once the user's question has sufficient specific details, call the `delegate_to_legal_agent` tool, passing a unified and detailed description of the scenario.
+5. Present the final response clearly to the user.
 
-Always use the `delegate_to_legal_agent` tool for any substantive legal question.
-Do not attempt to answer complex legal questions from your own knowledge alone.
-
-Be professional, clear, and make the specialist response accessible to the user.
+Always use the `delegate_to_legal_agent` tool only when you have enough information to get a meaningful analysis. Keep your interaction professional and clear. Answer in the same language as the user's query.
 """
 
 
@@ -87,10 +86,13 @@ def build_graph(trace_id: str, context_id: str, depth: int) -> Any:
             logger.exception("delegate_to_legal_agent failed: %s", exc)
             return f"Could not reach the Law Agent: {exc}"
 
+    from langgraph.checkpoint.memory import MemorySaver
+
     llm = get_llm()
     graph = create_react_agent(
         model=llm,
         tools=[delegate_to_legal_agent],
         prompt=CUSTOMER_SYSTEM_PROMPT,
+        checkpointer=MemorySaver(),
     )
     return graph

@@ -26,28 +26,52 @@ LEGAL_KNOWLEDGE = [
             "(4) cover damages. Statute of limitations is typically 4 years (UCC § 2-725)."
         ),
     },
-    # TODO: Thêm entry về luật lao động Việt Nam
-    # Gợi ý: id="labor_law", keywords=["lao động", "sa thải", ...], text="..."
+    {
+        "id": "labor_law",
+        "keywords": ["lao động", "sa thải", "hợp đồng lao động", "labor", "termination"],
+        "text": (
+            "Theo Bộ luật Lao động Việt Nam 2019, người sử dụng lao động có thể "
+            "đơn phương chấm dứt hợp đồng trong các trường hợp: (1) người lao động "
+            "thường xuyên không hoàn thành công việc; (2) bị ốm đau, tai nạn đã điều trị "
+            "12 tháng chưa khỏi; (3) thiên tai, hỏa hoạn; (4) người lao động đủ tuổi nghỉ hưu."
+        ),
+    },
 ]
 
 
 @tool
 def search_legal_knowledge(query: str) -> str:
-    """Tìm kiếm trong knowledge base pháp lý."""
-    query_lower = query.lower()
-    for entry in LEGAL_KNOWLEDGE:
-        if any(kw in query_lower for kw in entry["keywords"]):
-            return f"[{entry['id']}] {entry['text']}"
-    return "Không tìm thấy thông tin liên quan."
+    """Tìm kiếm trong knowledge base pháp lý sử dụng RAG pipeline của Day 08."""
+    import sys
+    import os
+    
+    # Thêm đường dẫn của thư mục rag_pipeline để import các modules RAG của Day08
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "rag_pipeline"))
+    from src.task9_retrieval_pipeline import retrieve
+    
+    results = retrieve(query, top_k=2)
+    if not results:
+        return "Không tìm thấy thông tin liên quan."
+    
+    formatted = []
+    for r in results:
+        formatted.append(f"[{r['metadata'].get('source', 'RAG')}] (score: {r.get('score', 0.0):.2f}) {r['content']}")
+    return "\n\n---\n\n".join(formatted)
 
 
-# TODO: Tạo tool check_statute_of_limitations
-# Gợi ý: nhận case_type (str), trả về thời hiệu khởi kiện
-# @tool
-# def check_statute_of_limitations(case_type: str) -> str:
-#     """Kiểm tra thời hiệu khởi kiện."""
-#     # YOUR CODE HERE
-#     pass
+@tool
+def check_statute_of_limitations(case_type: str) -> str:
+    """Kiểm tra thời hiệu khởi kiện theo loại vụ án.
+    
+    Args:
+        case_type: Loại vụ án (contract, tort, property)
+    """
+    limits = {
+        "contract": "4 năm (UCC § 2-725)",
+        "tort": "2-3 năm tùy bang",
+        "property": "5 năm",
+    }
+    return limits.get(case_type.lower(), "Không xác định")
 
 
 async def main():
@@ -55,7 +79,7 @@ async def main():
     llm = get_llm()
     
     # TODO: Thêm tool mới vào danh sách
-    tools = [search_legal_knowledge]  # Thêm check_statute_of_limitations vào đây
+    tools = [search_legal_knowledge, check_statute_of_limitations]
     llm_with_tools = llm.bind_tools(tools)
     
     question = "Thời hiệu khởi kiện vụ vi phạm hợp đồng là bao lâu?"
@@ -79,7 +103,8 @@ async def main():
             
             if tool_call["name"] == "search_legal_knowledge":
                 tool_result = search_legal_knowledge.invoke(tool_call["args"])
-            # TODO: Thêm xử lý cho check_statute_of_limitations
+            elif tool_call["name"] == "check_statute_of_limitations":
+                tool_result = check_statute_of_limitations.invoke(tool_call["args"])
             
             if tool_result:
                 messages.append(ToolMessage(content=tool_result, tool_call_id=tool_call["id"]))

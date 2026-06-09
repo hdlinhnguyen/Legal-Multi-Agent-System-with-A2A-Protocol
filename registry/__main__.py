@@ -27,6 +27,15 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="A2A Registry", version="1.0.0")
 
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # In-memory store: agent_name -> agent info dict
 agents: dict[str, dict[str, Any]] = {}
 
